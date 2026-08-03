@@ -1,0 +1,3 @@
+#!/usr/bin/env bb
+(require '[trace-history.cli :as cli])
+(apply cli/-main *command-line-args*)
