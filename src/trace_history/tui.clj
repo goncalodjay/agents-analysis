@@ -1,5 +1,6 @@
 (ns trace-history.tui
-  (:require [trace-history.core :as core]))
+  (:require [clojure.string :as str]
+            [trace-history.core :as core]))
 
 (defn start [records]
   (let [records (vec (sort-by :finished-at #(compare %2 %1)
@@ -32,7 +33,7 @@
 (defn render [model]
   (if (= :empty (:status model))
     "list: no consultations available | detail: | q: quit"
-    (str "list: " (clojure.string/join ", " (map :id (:records model)))
+    (str "list: " (str/join ", " (map :id (:records model)))
          " | selected: " (:selected-id model)
          " | detail: " (if (= :detail (:view model)) "open" "closed")
          " | q: quit")))
