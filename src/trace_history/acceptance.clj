@@ -70,7 +70,7 @@
     :else nil))
 
 (defn- generic-step? [text]
-  (or (re-find #"^(la consulta identifica|la consulta informa|la consulta contiene|la consulta preserva|el detalle de la consulta preserva|la lista|el panel|la TUI|el historial|el usuario|se consulta|se reinicia|la consulta|el resumen|el coste|no inventa)" text)
+  (or (re-find #"^(la consulta identifica|la consulta informa|la consulta contiene|la consulta preserva|el detalle de la consulta preserva|la lista|el panel|la TUI|el historial|el usuario|se consulta|se reinicia|la consulta|el resumen|el coste|no inventa|cada fila|el listado|el proceso|la pantalla|la consulta más reciente|las consultas|la fila|el usuario puede|el detalle|la navegación|la pantalla de inicio)" text)
       (re-find #"^When|^Then|^Given|^And" text)))
 
 (defn- execute-step [world text example]
