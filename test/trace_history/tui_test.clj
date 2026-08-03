@@ -17,3 +17,16 @@
   (is (= {:columns 80 :rows 24 :panels #{:list :detail}}
          (select-keys (tui/resize (tui/start records) 80 24)
                       [:columns :rows :panels]))))
+
+(deftest render-describes-both-panels
+  (let [screen (tui/render (tui/start records))]
+    (is (string? screen))
+    (is (re-find #"new" screen))
+    (is (re-find #"detail" screen))))
+
+(deftest input-loop-handles-navigation-detail-and-exit
+  (let [model (tui/start records)]
+    (is (= "old" (:selected-id (tui/handle-key model "down"))))
+    (is (= :detail (:view (tui/handle-key model "enter"))))
+    (is (= :list (:view (tui/handle-key (assoc model :view :detail) "esc"))))
+    (is (= 0 (:exit-code (tui/handle-key model "q"))))))
