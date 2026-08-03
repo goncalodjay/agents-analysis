@@ -1,6 +1,5 @@
 (ns trace-history.acceptance
   (:require [cheshire.core :as json]
-            [clojure.string :as str]
             [trace-history.core :as core]))
 
 (defn- value [example name] (get example name))
@@ -40,7 +39,9 @@
     (re-find #"^Pi Agent inicia la consulta" text) (assoc world :record {:id (value example "consulta_id") :status :running})
     (re-find #"^la consulta tiene el estado" text) (assoc-in world [:record :status] (keyword (value example "estado")))
     (re-find #"^Pi Agent finaliza la consulta .* sin informar" text) (assoc world :record {:id (value example "consulta_id") :status :completed})
-    (re-find #"^Pi Agent vuelve a informar" text) world
+    (re-find #"^Pi Agent vuelve a informar" text)
+    (update world :saved core/save-completed
+            {:id (value example "consulta_id") :status :completed})
     :else nil))
 
 (defn- persistence-step [world text example]
@@ -53,10 +54,12 @@
 
 (defn- assertion-step [world text example]
   (cond
-    (re-find #"^el historial local (contiene|muestra|ya contiene)" text) world
+    (re-find #"^el historial local ya contiene" text)
+    (assoc world :saved [{:id (value example "consulta_id") :status :completed}])
     (re-find #"^el historial local contiene una única" text)
     (if (= 1 (count (filter #(= (:id %) (value example "consulta_id")) (:saved world)))) world
         (throw (ex-info "duplicate consultation" {:step text})))
+    (re-find #"^el historial local (contiene|muestra|ya contiene)" text) world
     (re-find #"^el historial no contiene" text)
     (if (empty? (filter #(= (:id %) (value example "consulta_id")) (core/visible-consultations (:saved world)))) world
         (throw (ex-info "incomplete consultation visible" {:step text})))
