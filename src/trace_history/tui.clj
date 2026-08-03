@@ -28,3 +28,20 @@
 
 (defn resize [model columns rows]
   (assoc model :columns columns :rows rows :panels #{:list :detail}))
+
+(defn render [model]
+  (if (= :empty (:status model))
+    "list: no consultations available | detail: | q: quit"
+    (str "list: " (clojure.string/join ", " (map :id (:records model)))
+         " | selected: " (:selected-id model)
+         " | detail: " (if (= :detail (:view model)) "open" "closed")
+         " | q: quit")))
+
+(defn handle-key [model key]
+  (case key
+    "up" (move model :up)
+    "down" (move model :down)
+    "enter" (assoc model :view :detail)
+    "esc" (assoc model :view :list)
+    "q" (assoc model :exit-code 0 :running? false)
+    model))
