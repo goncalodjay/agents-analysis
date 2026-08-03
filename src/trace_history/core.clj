@@ -1,5 +1,7 @@
 (ns trace-history.core)
 
+(def ^:private usage-fields [:input :prompt :thinking :output])
+
 (defn completed? [record]
   (= :completed (:status record)))
 
@@ -13,17 +15,16 @@
 
 (defn attach-cost [record rates]
   (if (and rates (map? (:usage record))
-           (every? #(contains? rates %) [:input :prompt :thinking :output]))
+           (every? #(contains? rates %) usage-fields))
     (assoc record
            :cost (reduce + (map #(* (double (get-in record [:usage %] 0))
                                     (double (get rates %)))
-                                [:input :prompt :thinking :output]))
+                                usage-fields))
            :rate-snapshot rates)
     (dissoc record :cost :rate-snapshot)))
 
 (defn- token-total [record]
-  (reduce + (map #(long (get-in record [:usage %] 0))
-                 [:input :prompt :thinking :output])))
+  (reduce + (map #(long (get-in record [:usage %] 0)) usage-fields)))
 
 (defn summarize [records]
   (let [records (visible-consultations records)
