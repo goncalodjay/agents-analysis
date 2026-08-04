@@ -106,6 +106,15 @@ func TestDaemonRejectsInvalidEventsWithoutWritingHistory(t *testing.T) {
 	}
 }
 
+func TestEventValidationAcceptsZeroMeasurements(t *testing.T) {
+	event := validEvent()
+	event.Usage = Usage{}
+	event.DurationMS = 0
+	if err := event.Validate(); err != nil {
+		t.Fatalf("Validate() = %v", err)
+	}
+}
+
 func TestEventValidationRejectsEveryMissingIdentityAndInvalidMeasurement(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -146,6 +155,18 @@ func TestServeStopsWhenListenerCloses(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := Serve(context.Background(), listener, nil); err != nil {
+		t.Fatalf("Serve() = %v", err)
+	}
+}
+
+func TestServeStopsWhenContextIsCancelled(t *testing.T) {
+	listener, err := net.Listen("unix", filepath.Join(t.TempDir(), "cancelled.sock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := Serve(ctx, listener, nil); err != nil {
 		t.Fatalf("Serve() = %v", err)
 	}
 }
