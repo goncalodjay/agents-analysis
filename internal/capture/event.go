@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/gonza/agents-analysis/internal/history"
+	"github.com/gonza/agents-analysis/internal/consultation"
 )
 
 // ConsultationStore is the persistence boundary used by the capture daemon.
 type ConsultationStore interface {
-	Save(history.Consultation) error
+	Save(consultation.Consultation) error
 }
 
 type Event struct {
@@ -102,17 +102,17 @@ func (usage Usage) hasNegativeValue() bool {
 	return false
 }
 
-func (event Event) Consultation() history.Consultation {
-	tools := make([]history.ToolResult, 0, len(event.Tools))
+func (event Event) Consultation() consultation.Consultation {
+	tools := make([]consultation.ToolResult, 0, len(event.Tools))
 	for _, tool := range event.Tools {
-		tools = append(tools, history.ToolResult{Tool: tool.Name, Request: string(tool.Input), Result: tool.Output})
+		tools = append(tools, consultation.ToolResult{Tool: tool.Name, Request: string(tool.Input), Result: tool.Output})
 	}
-	return history.Consultation{
-		ID: event.ID, Status: history.Completed, Provider: event.Identity.Provider, Model: event.Identity.Model,
+	return consultation.Consultation{
+		ID: event.ID, Status: consultation.Completed, Provider: event.Identity.Provider, Model: event.Identity.Model,
 		Harness: event.Agent, InferenceParameters: "reasoning=" + event.Identity.ReasoningLevel,
 		Prompts: map[string]string{"system": event.Content.SystemPrompt, "user": event.Content.UserPrompt},
 		Context: event.Content.Context, Response: event.Content.Response, ToolResults: tools,
-		Usage:     history.Usage{Input: event.Usage.Input, Prompt: event.Usage.Prompt, Thinking: event.Usage.Thinking, Output: event.Usage.Output},
+		Usage:     consultation.Usage{Input: event.Usage.Input, Prompt: event.Usage.Prompt, Thinking: event.Usage.Thinking, Output: event.Usage.Output},
 		StartedAt: event.StartedAt, FinishedAt: event.FinishedAt, DurationMS: event.DurationMS, Result: event.Result, Error: event.Error,
 	}
 }
