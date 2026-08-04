@@ -1,0 +1,102 @@
+import assert from "node:assert/strict";
+import { mkdir, rm } from "node:fs/promises";
+import { join } from "node:path";
+import test from "node:test";
+
+import { CaptureController, FileOutbox, buildCompletedEvent, type CompletedEvent, type Outbox } from "./agents-analysis.ts";
+
+function memoryOutbox(): Outbox & { pending: CompletedEvent[]; delivered: Set<string> } {
+  const pending: CompletedEvent[] = [];
+  const delivered = new Set<string>();
+  return {
+    pending,
+    delivered,
+    async hasDelivered(id) { return delivered.has(id); },
+    async enqueue(event) { if (!pending.some((item) => item.id === event.id)) pending.push(event); },
+    async listPending() { return [...pending]; },
+    async markDelivered(id) {
+      const index = pending.findIndex((event) => event.id === id);
+      if (index >= 0) pending.splice(index, 1);
+      delivered.add(id);
+    },
+  };
+}
+
+const turn = {
+  sessionId: "pi-1",
+  leafId: "assistant-1",
+  provider: "openai",
+  model: "gpt-5",
+  reasoningLevel: "medium",
+  systemPrompt: "eres-asistente",
+  context: "AGENTS.md=reglas",
+  userPrompt: "resume-el-repositorio",
+  startedAt: 1_000,
+  settledAt: 3_000,
+  entries: [
+    { type: "message", message: { role: "assistant", provider: "openai", model: "gpt-5", stopReason: "toolUse", usage: { input: 120, output: 40, reasoning: 40, cacheRead: 80, cacheWrite: 0 }, content: [{ type: "toolCall", id: "call-1", name: "read", arguments: { path: "file" } }] } },
+    { type: "message", message: { role: "toolResult", toolCallId: "call-1", toolName: "read", isError: false, content: [{ type: "text", text: "contenido" }] } },
+    { type: "message", message: { role: "assistant", provider: "openai", model: "gpt-5", stopReason: "stop", usage: { input: 0, output: 160, reasoning: 0, cacheRead: 0, cacheWrite: 0 }, content: [{ type: "text", text: "repositorio-resumido" }] } },
+  ],
+};
+
+test("builds a completed event preserving identity, content, usage, duration, result, and tools", () => {
+  const event = buildCompletedEvent(turn);
+
+  assert.equal(event.id, "pi-1:assistant-1");
+  assert.deepEqual(event.identity, { sessionId: "pi-1", turnId: "assistant-1", provider: "openai", model: "gpt-5", reasoningLevel: "medium" });
+  assert.deepEqual(event.content, { systemPrompt: "eres-asistente", context: "AGENTS.md=reglas", userPrompt: "resume-el-repositorio", response: "repositorio-resumido" });
+  assert.deepEqual(event.usage, { input: 120, prompt: 80, thinking: 40, output: 160, cacheRead: 80, cacheWrite: 0 });
+  assert.equal(event.durationMs, 2_000);
+  assert.equal(event.result, "success");
+  assert.deepEqual(event.tools, [{ id: "call-1", name: "read", input: { path: "file" }, output: "contenido", isError: false }]);
+});
+
+test("does not deliver a settled consultation twice", async () => {
+  const outbox = memoryOutbox();
+  const delivered: CompletedEvent[] = [];
+  const capture = new CaptureController(outbox, async (event) => { delivered.push(event); });
+
+  await capture.settled(buildCompletedEvent(turn));
+  await capture.settled(buildCompletedEvent(turn));
+
+  assert.equal(delivered.length, 1);
+});
+
+test("retains an event while unavailable and retries it later", async () => {
+  const outbox = memoryOutbox();
+  let available = false;
+  const delivered: CompletedEvent[] = [];
+  const capture = new CaptureController(outbox, async (event) => {
+    if (!available) throw new Error("daemon unavailable");
+    delivered.push(event);
+  });
+
+  await capture.settled(buildCompletedEvent(turn));
+  assert.equal(outbox.pending.length, 1);
+
+  available = true;
+  await capture.retry();
+
+  assert.equal(outbox.pending.length, 0);
+  assert.deepEqual(delivered.map((event) => event.id), ["pi-1:assistant-1"]);
+});
+
+test("persists pending events across extension restarts", async () => {
+  const directory = join(process.cwd(), "tmp", "pi-extension-outbox-test");
+  const path = join(directory, "outbox.json");
+  await rm(directory, { recursive: true, force: true });
+  await mkdir(directory, { recursive: true });
+  try {
+    const event = buildCompletedEvent(turn);
+    await new CaptureController(new FileOutbox(path), async () => { throw new Error("offline"); }).settled(event);
+
+    const delivered: string[] = [];
+    await new CaptureController(new FileOutbox(path), async (pending) => { delivered.push(pending.id); }).retry();
+
+    assert.deepEqual(delivered, [event.id]);
+    assert.deepEqual(await new FileOutbox(path).listPending(), []);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
