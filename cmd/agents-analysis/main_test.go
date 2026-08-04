@@ -20,3 +20,13 @@ func TestUnknownOptionIsAnError(t *testing.T) {
 		t.Fatalf("exit code = %d", code)
 	}
 }
+
+func TestDaemonRejectsNonUnixSocket(t *testing.T) {
+	var output, errors bytes.Buffer
+	if code := run([]string{"daemon", "--socket", "tcp://localhost:1234"}, bytes.NewBuffer(nil), &output, &errors); code != 2 {
+		t.Fatalf("exit code = %d", code)
+	}
+	if !bytes.Contains(errors.Bytes(), []byte("unix://")) {
+		t.Fatalf("unexpected error: %s", errors.String())
+	}
+}

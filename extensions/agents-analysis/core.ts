@@ -3,6 +3,7 @@ export type CompletedEvent = {
   type: "consultation.completed";
   version: 1;
   id: string;
+  agent: string;
   identity: { sessionId: string; turnId: string; provider: string; model: string; reasoningLevel: string };
   content: { systemPrompt: string; context: string; userPrompt: string; response: string };
   usage: { input: number; prompt: number; thinking: number; output: number; cacheRead: number; cacheWrite: number };
@@ -111,6 +112,7 @@ export function buildCompletedEvent(turn: TurnSnapshot): CompletedEvent {
     type: "consultation.completed",
     version: 1,
     id: `${turn.sessionId}:${turn.leafId}`,
+    agent: "pi",
     identity: { sessionId: turn.sessionId, turnId: turn.leafId, provider: turn.provider, model: turn.model, reasoningLevel: turn.reasoningLevel },
     content: {
       systemPrompt: turn.systemPrompt,
