@@ -46,7 +46,9 @@ func (m Model) Move(delta int) Model {
 			break
 		}
 	}
-	index = (index + delta + len(m.Records)) % len(m.Records)
+	length := len(m.Records)
+	delta %= length
+	index = (index + delta + length) % length
 	m.SelectedID = m.Records[index].ID
 	return m
 }
@@ -98,37 +100,50 @@ func (m Model) VisibleCost() float64 {
 	return cost
 }
 
+var keyActions = map[string]func(Model) Model{
+	"tab":   toggleFocus,
+	"up":    moveUp,
+	"down":  moveDown,
+	"enter": func(model Model) Model { model.Detail = true; return model },
+	"esc":   func(model Model) Model { model.Detail = false; return model },
+	"?":     func(model Model) Model { model.Help = !model.Help; return model },
+}
+
 func (m Model) HandleKey(key string) (Model, bool) {
 	if key == "q" {
 		return m, true
 	}
-	switch key {
-	case "tab":
-		if m.Focus == ListPanel {
-			m.Focus = DetailPanel
-		} else {
-			m.Focus = ListPanel
-		}
-	case "up":
-		if m.Focus == ListPanel {
-			m = m.Move(-1)
-		} else if m.DetailScroll > 0 {
-			m.DetailScroll--
-		}
-	case "down":
-		if m.Focus == ListPanel {
-			m = m.Move(1)
-		} else {
-			m.DetailScroll++
-		}
-	case "enter":
-		m.Detail = true
-	case "esc":
-		m.Detail = false
-	case "?":
-		m.Help = !m.Help
+	if action := keyActions[key]; action != nil {
+		m = action(m)
 	}
 	return m, false
+}
+
+func toggleFocus(model Model) Model {
+	if model.Focus == ListPanel {
+		model.Focus = DetailPanel
+	} else {
+		model.Focus = ListPanel
+	}
+	return model
+}
+
+func moveUp(model Model) Model {
+	if model.Focus == ListPanel {
+		return model.Move(-1)
+	}
+	if model.DetailScroll > 0 {
+		model.DetailScroll--
+	}
+	return model
+}
+
+func moveDown(model Model) Model {
+	if model.Focus == ListPanel {
+		return model.Move(1)
+	}
+	model.DetailScroll++
+	return model
 }
 
 func (m Model) selected() *history.Consultation {
@@ -141,6 +156,12 @@ func (m Model) selected() *history.Consultation {
 }
 
 func (m Model) Render() string {
+	return box("List", m.renderList()) + "\n" +
+		box("Detail", "detail:\n"+m.renderDetail()) + "\n" +
+		box("Keys", m.renderKeyHelp())
+}
+
+func (m Model) renderList() string {
 	list := make([]string, 0, len(m.Records))
 	for _, record := range m.Records {
 		marker := " "
@@ -150,20 +171,25 @@ func (m Model) Render() string {
 		list = append(list, fmt.Sprintf("%s %s  %s/%s", marker, record.ID, record.Provider, record.Model))
 	}
 	if len(list) == 0 {
-		list = append(list, "no consultations available")
+		return "no consultations available"
 	}
-	detail := ""
-	if record := m.selected(); record != nil {
-		detail = fmt.Sprintf("id: %s\nprovider: %s\nmodel: %s\nstatus: %s\nsystem: %s\ncontext: %s\nuser: %s\nresponse: %s\ntools: %s", record.ID, record.Provider, record.Model, record.Status, record.Prompts["system"], record.Context, record.Prompts["user"], record.Response, renderTools(record.ToolResults))
+	return strings.Join(list, "\n")
+}
+
+func (m Model) renderDetail() string {
+	record := m.selected()
+	if record == nil {
+		return "no selection"
 	}
-	if detail == "" {
-		detail = "no selection"
-	}
+	return fmt.Sprintf("id: %s\nprovider: %s\nmodel: %s\nstatus: %s\nsystem: %s\ncontext: %s\nuser: %s\nresponse: %s\ntools: %s", record.ID, record.Provider, record.Model, record.Status, record.Prompts["system"], record.Context, record.Prompts["user"], record.Response, renderTools(record.ToolResults))
+}
+
+func (m Model) renderKeyHelp() string {
 	help := "up/down: navigate | tab: focus | ? : help | q: quit | filter: provider=<name>"
 	if m.Help {
 		help = "Commands: navigation, focus, scrolling, filters and exit\n" + help
 	}
-	return box("List", strings.Join(list, "\n")) + "\n" + box("Detail", "detail:\n"+detail) + "\n" + box("Keys", fmt.Sprintf("focus: %s | filter: %s | cost: %.2f\n%s", m.Focus, m.Filter, m.VisibleCost(), help))
+	return fmt.Sprintf("focus: %s | filter: %s | cost: %.2f\n%s", m.Focus, m.Filter, m.VisibleCost(), help)
 }
 
 func renderTools(tools []history.ToolResult) string {

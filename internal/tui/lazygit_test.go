@@ -38,6 +38,15 @@ func TestFocusMovesDetailWithoutChangingSelection(t *testing.T) {
 	if scrolled.SelectedID != "pi-1" || scrolled.DetailScroll != 1 {
 		t.Fatalf("unexpected state: %#v", scrolled)
 	}
+	scrolled, _ = scrolled.HandleKey("up")
+	if scrolled.DetailScroll != 0 {
+		t.Fatalf("detail scroll = %d", scrolled.DetailScroll)
+	}
+	list, _ := scrolled.HandleKey("tab")
+	list, _ = list.HandleKey("up")
+	if list.Focus != ListPanel || list.SelectedID != "pi-1" {
+		t.Fatalf("unexpected list state: %#v", list)
+	}
 }
 
 func TestFilterRestrictsRecordsAndDisplayedCostThenRestores(t *testing.T) {
