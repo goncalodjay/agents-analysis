@@ -46,17 +46,23 @@
 
 (defn- persistence-step [world text example]
   (cond
-    (re-find #"^se persiste" text)
+    (re-find #"^el historial SQLite está ubicado" text) (assoc world :path (value example "ruta_base"))
+    (re-find #"^el historial recibe la consulta finalizada" text)
+    (assoc world :record {:id (value example "consulta_id") :status :completed})
+    (re-find #"^(se persiste|el historial persiste)" text)
     (let [record (if (:rates world) (core/attach-cost (:record world) (:rates world)) (:record world))]
       (assoc world :saved (core/save-completed (:saved world) record) :record record))
     (re-find #"^la base SQLite" text) (assoc world :saved [{:id (value example "consulta_id") :status :completed}])
+    (re-find #"^el daemon se reinicia" text) world
+    (re-find #"^el daemon recibe nuevamente" text)
+    (update world :saved core/save-completed {:id (value example "consulta_id") :status :completed})
     :else nil))
 
 (defn- assertion-step [world text example]
   (cond
     (re-find #"^el historial local ya contiene" text)
     (assoc world :saved [{:id (value example "consulta_id") :status :completed}])
-    (re-find #"^el historial local contiene una única" text)
+    (re-find #"^(el historial local|la base) contiene una única" text)
     (if (= 1 (count (filter #(= (:id %) (value example "consulta_id")) (:saved world)))) world
         (throw (ex-info "duplicate consultation" {:step text})))
     (re-find #"^el historial local (contiene|muestra|ya contiene)" text) world
