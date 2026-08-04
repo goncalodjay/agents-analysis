@@ -68,26 +68,21 @@ func Open(path string) (*Store, error) {
 	}
 	return store, nil
 }
-func legacyString(source, key string) string {
-	match := regexp.MustCompile(`:` + key + `\s+"([^"]*)"`).FindStringSubmatch(source)
+func legacyValue(source, key, pattern string) string {
+	match := regexp.MustCompile(`:` + key + `\s+` + pattern).FindStringSubmatch(source)
 	if len(match) == 2 {
 		return match[1]
 	}
 	return ""
+}
+func legacyString(source, key string) string {
+	return legacyValue(source, key, `"([^"]*)"`)
 }
 func legacyKeyword(source, key string) string {
-	match := regexp.MustCompile(`:` + key + `\s+:([^\s}]+)`).FindStringSubmatch(source)
-	if len(match) == 2 {
-		return match[1]
-	}
-	return ""
+	return legacyValue(source, key, `:([^\s}]+)`)
 }
 func legacyRate(source, key string) float64 {
-	match := regexp.MustCompile(`:` + key + `\s+([0-9.]+)`).FindStringSubmatch(source)
-	if len(match) != 2 {
-		return 0
-	}
-	value, _ := strconv.ParseFloat(match[1], 64)
+	value, _ := strconv.ParseFloat(legacyValue(source, key, `([0-9.]+)`), 64)
 	return value
 }
 func legacyConsultation(encoded string) (Consultation, error) {

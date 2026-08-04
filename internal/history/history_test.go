@@ -3,6 +3,7 @@ package history
 import (
 	"path/filepath"
 	"testing"
+	"testing/quick"
 )
 
 func TestStoreRoundTripsCompleteConsultation(t *testing.T) {
@@ -64,5 +65,16 @@ func TestCompletedConsultationsHaveCostsAndSummary(t *testing.T) {
 	summary := Summarize([]Consultation{rated})
 	if summary.Tokens != 180 || summary.Cost == nil {
 		t.Fatalf("unexpected summary: %#v", summary)
+	}
+}
+
+func TestSummaryConservesCompletedTokenCounts(t *testing.T) {
+	property := func(input, prompt, thinking, output uint16) bool {
+		usage := Usage{Input: int64(input), Prompt: int64(prompt), Thinking: int64(thinking), Output: int64(output)}
+		got := Summarize([]Consultation{{Status: Completed, Usage: usage}})
+		return got.Tokens == usage.Input+usage.Prompt+usage.Thinking+usage.Output && got.Cost == nil
+	}
+	if err := quick.Check(property, nil); err != nil {
+		t.Error(err)
 	}
 }
