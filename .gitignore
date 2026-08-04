@@ -6,3 +6,5 @@
 swarmforge/scripts/
 build/
 tmp/
+.cache/
+.tools/
