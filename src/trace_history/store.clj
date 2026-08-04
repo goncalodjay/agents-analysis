@@ -30,32 +30,37 @@ connection.close()")
 (defn- decode [value]
   (edn/read-string (String. (.decode (java.util.Base64/getDecoder) value) "UTF-8")))
 
-(defn- sqlite-file? [path]
-  (and (.exists (io/file path))
-       (with-open [input (java.io.FileInputStream. path)]
+(defn- store-file [path]
+  (io/file path))
+
+(defn- sqlite-file? [file]
+  (and (.exists file)
+       (with-open [input (java.io.FileInputStream. file)]
          (= "SQLite format 3\000"
             (String. (.readNBytes input 16) "UTF-8")))))
 
-(defn- legacy-store [path]
-  (when (and (.exists (io/file path)) (not (sqlite-file? path)))
-    (edn/read-string (slurp path))))
+(defn- legacy-store [file]
+  (when (and (.exists file) (not (sqlite-file? file)))
+    (edn/read-string (slurp file))))
 
 (defn- invoke-sqlite! [path action input]
   (process/shell {:in input :out :string :err :string}
                  "python3" "-c" sqlite-adapter path action))
 
 (defn load-store [path]
-  (cond
-    (not (.exists (io/file path))) empty-store
-    (not (sqlite-file? path)) (or (legacy-store path) empty-store)
-    :else (let [result (json/parse-string (:out (invoke-sqlite! path "read" "")) true)]
-            {:consultations (mapv decode (:consultations result))
-             :rates (if-let [rates (:rates result)] (decode rates) {})})))
+  (let [file (store-file path)]
+    (cond
+      (not (.exists file)) empty-store
+      (not (sqlite-file? file)) (or (legacy-store file) empty-store)
+      :else (let [result (json/parse-string (:out (invoke-sqlite! path "read" "")) true)]
+              {:consultations (mapv decode (:consultations result))
+               :rates (if-let [rates (:rates result)] (decode rates) {})}))))
 
 (defn save-store! [path state]
-  (io/make-parents path)
-  (when (legacy-store path)
-    (.delete (io/file path)))
+  (let [file (store-file path)]
+    (io/make-parents file)
+    (when (legacy-store file)
+      (.delete file)))
   (let [payload (json/generate-string
                  {:consultations (mapv (fn [record] [(str (:id record)) (encode record)])
                                        (:consultations state))
