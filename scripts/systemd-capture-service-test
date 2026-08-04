@@ -1,0 +1,40 @@
+#!/bin/sh
+set -eu
+
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+temporary=$(mktemp -d)
+trap 'rm -rf "$temporary"' EXIT HUP INT TERM
+mkdir -p "$temporary/bin" "$temporary/config"
+
+cat > "$temporary/bin/agents-analysis" <<'EOF'
+#!/bin/sh
+exit 0
+EOF
+cat > "$temporary/bin/systemctl" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$*" >> "$SYSTEMCTL_LOG"
+EOF
+chmod +x "$temporary/bin/agents-analysis" "$temporary/bin/systemctl"
+
+PATH="$temporary/bin:$PATH" XDG_CONFIG_HOME="$temporary/config" SYSTEMCTL="$temporary/bin/systemctl" SYSTEMCTL_LOG="$temporary/systemctl.log" \
+  "$root/swarmforge/scripts/install_systemd_capture_service.sh"
+
+unit="$temporary/config/systemd/user/agents-analysis-capture.service"
+test -f "$unit"
+grep -F "ExecStart=\"$temporary/bin/agents-analysis\" daemon" "$unit" >/dev/null
+grep -Fx -- '--user daemon-reload' "$temporary/systemctl.log" >/dev/null
+grep -Fx -- '--user enable --now agents-analysis-capture.service' "$temporary/systemctl.log" >/dev/null
+
+if AGENTS_ANALYSIS_BINARY=relative XDG_CONFIG_HOME="$temporary/config" SYSTEMCTL="$temporary/bin/systemctl" \
+  "$root/swarmforge/scripts/install_systemd_capture_service.sh" 2>/dev/null; then
+  printf '%s\n' 'relative binary path was accepted' >&2
+  exit 1
+fi
+unsafe="$temporary/bin/unsafe\"name"
+cp "$temporary/bin/agents-analysis" "$unsafe"
+chmod +x "$unsafe"
+if AGENTS_ANALYSIS_BINARY="$unsafe" XDG_CONFIG_HOME="$temporary/config" SYSTEMCTL="$temporary/bin/systemctl" \
+  "$root/swarmforge/scripts/install_systemd_capture_service.sh" 2>/dev/null; then
+  printf '%s\n' 'unsafe binary path was accepted' >&2
+  exit 1
+fi

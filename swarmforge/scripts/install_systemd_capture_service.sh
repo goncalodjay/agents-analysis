@@ -11,10 +11,24 @@ systemctl_command=${SYSTEMCTL:-systemctl}
 if [ -z "$binary" ]; then
   binary=$(command -v agents-analysis || true)
 fi
-if [ -z "$binary" ]; then
-  printf '%s\n' 'agents-analysis binary not found in PATH' >&2
+if [ -z "$binary" ] || [ ! -x "$binary" ]; then
+  printf '%s\n' 'agents-analysis binary not found or not executable' >&2
   exit 1
 fi
+case "$binary" in
+  /*) ;;
+  *)
+    printf '%s\n' 'agents-analysis binary must be an absolute path' >&2
+    exit 1
+    ;;
+esac
+case "$binary" in
+  *"
+"*|*'"'*|*'\'*)
+    printf '%s\n' 'agents-analysis binary path contains unsafe unit-file characters' >&2
+    exit 1
+    ;;
+esac
 
 mkdir -p "$unit_dir"
 escaped_binary=$(printf '%s' "$binary" | sed 's/[\\&|]/\\&/g')
