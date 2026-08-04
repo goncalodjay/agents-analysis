@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 )
 
@@ -21,7 +22,25 @@ func TestUnknownOptionIsAnError(t *testing.T) {
 	}
 }
 
+func TestTUIReportsHomeDirectoryFailure(t *testing.T) {
+	original := userHomeDir
+	userHomeDir = func() (string, error) { return "", errors.New("home unavailable") }
+	t.Cleanup(func() { userHomeDir = original })
+
+	var output, errorsOut bytes.Buffer
+	if code := run([]string{"--history", "/tmp/history.sqlite"}, bytes.NewBuffer(nil), &output, &errorsOut); code != 1 {
+		t.Fatalf("exit code = %d", code)
+	}
+	if !bytes.Contains(errorsOut.Bytes(), []byte("Unable to find home directory")) {
+		t.Fatalf("unexpected error: %s", errorsOut.String())
+	}
+}
+
 func TestDaemonConfigParsesOptionsAndResolvesUnixPaths(t *testing.T) {
+	defaults, err := parseDaemonConfig(nil)
+	if err != nil || defaults.historyPath != defaultHistoryPath {
+		t.Fatalf("default config = %#v, %v", defaults, err)
+	}
 	config, err := parseDaemonConfig([]string{"--socket", "unix:///tmp/daemon.sock", "--history", "/tmp/history.sqlite"})
 	if err != nil {
 		t.Fatal(err)
@@ -34,6 +53,9 @@ func TestDaemonConfigParsesOptionsAndResolvesUnixPaths(t *testing.T) {
 	}
 	if path, err := resolveSocketPath("unix://~", "/home/test"); err != nil || path != "/home/test" {
 		t.Fatalf("resolveSocketPath() = %q, %v", path, err)
+	}
+	if path := resolveUserPath(defaultHistoryPath, "/home/test"); path != "/home/test/.local/share/agents-analysis/trazas.sqlite" {
+		t.Fatalf("resolveUserPath() = %q", path)
 	}
 	if _, err := resolveSocketPath("tcp://localhost", "/home/test"); err == nil {
 		t.Fatal("non-Unix address was accepted")

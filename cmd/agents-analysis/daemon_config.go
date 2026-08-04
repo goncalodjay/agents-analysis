@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	defaultHistoryPath   = "datos/trazas.sqlite"
+	defaultHistoryPath   = "~/.local/share/agents-analysis/trazas.sqlite"
 	defaultSocketAddress = "unix://~/.local/share/agents-analysis/daemon.sock"
 )
 
@@ -39,12 +39,15 @@ func resolveSocketPath(address, home string) (string, error) {
 	if !strings.HasPrefix(address, "unix://") {
 		return "", errors.New("daemon socket must use unix://")
 	}
-	path := strings.TrimPrefix(address, "unix://")
+	return resolveUserPath(strings.TrimPrefix(address, "unix://"), home), nil
+}
+
+func resolveUserPath(path, home string) string {
 	if path == "~" {
-		return home, nil
+		return home
 	}
 	if strings.HasPrefix(path, "~/") {
-		return filepath.Join(home, strings.TrimPrefix(path, "~/")), nil
+		return filepath.Join(home, strings.TrimPrefix(path, "~/"))
 	}
-	return path, nil
+	return path
 }

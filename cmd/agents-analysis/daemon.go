@@ -19,7 +19,7 @@ func runDaemon(args []string, errorsOut io.Writer) int {
 		fmt.Fprint(errorsOut, usage+"Unknown option or arguments\n")
 		return 2
 	}
-	home, err := os.UserHomeDir()
+	home, err := userHomeDir()
 	if err != nil {
 		fmt.Fprintln(errorsOut, "Unable to find home directory:", err)
 		return 1
@@ -43,7 +43,7 @@ func runDaemon(args []string, errorsOut io.Writer) int {
 		return 1
 	}
 	defer func() { listener.Close(); os.Remove(socketPath) }()
-	store, err := history.Open(config.historyPath)
+	store, err := history.Open(resolveUserPath(config.historyPath, home))
 	if err != nil {
 		fmt.Fprintln(errorsOut, "Unable to open history:", err)
 		return 1

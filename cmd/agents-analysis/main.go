@@ -13,11 +13,13 @@ import (
 
 const usage = "Usage: agents-analysis [--history <path>] | agents-analysis daemon [--history <path>] [--socket <unix://path>]\n\nOptions:\n  --history <path>  local history file\n  --socket <address> Unix socket for daemon events\n  --help            show this help\n"
 
+var userHomeDir = os.UserHomeDir
+
 func run(args []string, input io.Reader, output, errors io.Writer) int {
 	if len(args) > 0 && args[0] == "daemon" {
 		return runDaemon(args[1:], errors)
 	}
-	path := "datos/trazas.sqlite"
+	path := defaultHistoryPath
 	if len(args) == 1 && args[0] == "--help" {
 		fmt.Fprint(output, usage)
 		return 0
@@ -28,7 +30,12 @@ func run(args []string, input io.Reader, output, errors io.Writer) int {
 		fmt.Fprint(errors, usage+"Unknown option or arguments\n")
 		return 2
 	}
-	store, err := history.Open(path)
+	home, err := userHomeDir()
+	if err != nil {
+		fmt.Fprintln(errors, "Unable to find home directory:", err)
+		return 1
+	}
+	store, err := history.Open(resolveUserPath(path, home))
 	if err != nil {
 		fmt.Fprintln(errors, "Unable to start history TUI:", err)
 		return 1
