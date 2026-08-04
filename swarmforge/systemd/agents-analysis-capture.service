@@ -5,7 +5,7 @@ After=default.target
 [Service]
 Type=simple
 ExecStartPre=/usr/bin/install -d -m 700 %h/.local/share/agents-analysis
-ExecStart=@BINARY@ daemon --history %h/.local/share/agents-analysis/trazas.sqlite --socket unix://%h/.local/share/agents-analysis/daemon.sock
+ExecStart="@BINARY@" daemon --history %h/.local/share/agents-analysis/trazas.sqlite --socket unix://%h/.local/share/agents-analysis/daemon.sock
 Restart=on-failure
 RestartSec=2
 UMask=0077
