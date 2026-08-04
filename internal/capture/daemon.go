@@ -67,16 +67,39 @@ type Reply struct {
 }
 
 func (event Event) Validate() error {
-	if event.Type != "consultation.completed" || event.Version != 1 || event.ID == "" || event.Agent == "" || event.Identity.SessionID == "" || event.Identity.TurnID == "" || event.Identity.Provider == "" || event.Identity.Model == "" {
+	if !event.hasRequiredIdentity() {
 		return errors.New("identidad obligatoria")
 	}
-	if event.Usage.Input < 0 || event.Usage.Prompt < 0 || event.Usage.Thinking < 0 || event.Usage.Output < 0 || event.Usage.CacheRead < 0 || event.Usage.CacheWrite < 0 {
+	if event.Usage.hasNegativeValue() {
 		return errors.New("uso de tokens inválido")
 	}
 	if event.DurationMS < 0 {
 		return errors.New("duración inválida")
 	}
 	return nil
+}
+
+func (event Event) hasRequiredIdentity() bool {
+	if event.Type != "consultation.completed" || event.Version != 1 {
+		return false
+	}
+	required := []string{event.ID, event.Agent, event.Identity.SessionID, event.Identity.TurnID, event.Identity.Provider, event.Identity.Model}
+	for _, value := range required {
+		if value == "" {
+			return false
+		}
+	}
+	return true
+}
+
+func (usage Usage) hasNegativeValue() bool {
+	values := [...]int64{usage.Input, usage.Prompt, usage.Thinking, usage.Output, usage.CacheRead, usage.CacheWrite}
+	for _, value := range values {
+		if value < 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func (event Event) Consultation() history.Consultation {
@@ -99,13 +122,17 @@ func Serve(ctx context.Context, listener net.Listener, store *history.Store) err
 	for {
 		connection, err := listener.Accept()
 		if err != nil {
-			if ctx.Err() != nil || errors.Is(err, net.ErrClosed) || strings.Contains(err.Error(), "use of closed network connection") {
+			if listenerWasClosed(ctx, err) {
 				return nil
 			}
 			return err
 		}
 		go handle(connection, store)
 	}
+}
+
+func listenerWasClosed(ctx context.Context, err error) bool {
+	return ctx.Err() != nil || errors.Is(err, net.ErrClosed) || strings.Contains(err.Error(), "use of closed network connection")
 }
 
 func handle(connection net.Conn, store *history.Store) {

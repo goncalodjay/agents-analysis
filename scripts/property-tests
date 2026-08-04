@@ -3,4 +3,6 @@ set -eu
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$root"
-exec node --experimental-strip-types --test extensions/agents-analysis.property.test.ts
+node --experimental-strip-types --test extensions/agents-analysis.property.test.ts
+GOMODCACHE="$root/.cache/gomod" GOCACHE="$root/.cache/gocache" \
+  go test -tags property ./internal/capture -run Property

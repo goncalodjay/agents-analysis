@@ -106,6 +106,50 @@ func TestDaemonRejectsInvalidEventsWithoutWritingHistory(t *testing.T) {
 	}
 }
 
+func TestEventValidationRejectsEveryMissingIdentityAndInvalidMeasurement(t *testing.T) {
+	tests := []struct {
+		name   string
+		change func(*Event)
+		reason string
+	}{
+		{"type", func(event *Event) { event.Type = "other" }, "identidad obligatoria"},
+		{"version", func(event *Event) { event.Version = 2 }, "identidad obligatoria"},
+		{"id", func(event *Event) { event.ID = "" }, "identidad obligatoria"},
+		{"agent", func(event *Event) { event.Agent = "" }, "identidad obligatoria"},
+		{"turn", func(event *Event) { event.Identity.TurnID = "" }, "identidad obligatoria"},
+		{"provider", func(event *Event) { event.Identity.Provider = "" }, "identidad obligatoria"},
+		{"model", func(event *Event) { event.Identity.Model = "" }, "identidad obligatoria"},
+		{"negative input", func(event *Event) { event.Usage.Input = -1 }, "uso de tokens inválido"},
+		{"negative prompt", func(event *Event) { event.Usage.Prompt = -1 }, "uso de tokens inválido"},
+		{"negative thinking", func(event *Event) { event.Usage.Thinking = -1 }, "uso de tokens inválido"},
+		{"negative cache read", func(event *Event) { event.Usage.CacheRead = -1 }, "uso de tokens inválido"},
+		{"negative cache write", func(event *Event) { event.Usage.CacheWrite = -1 }, "uso de tokens inválido"},
+		{"negative duration", func(event *Event) { event.DurationMS = -1 }, "duración inválida"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			event := validEvent()
+			test.change(&event)
+			if err := event.Validate(); err == nil || err.Error() != test.reason {
+				t.Fatalf("Validate() = %v, want %q", err, test.reason)
+			}
+		})
+	}
+}
+
+func TestServeStopsWhenListenerCloses(t *testing.T) {
+	listener, err := net.Listen("unix", filepath.Join(t.TempDir(), "closed.sock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := listener.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := Serve(context.Background(), listener, nil); err != nil {
+		t.Fatalf("Serve() = %v", err)
+	}
+}
+
 func TestDaemonPreservesAnyAgentAsTheHarness(t *testing.T) {
 	address, store, _ := startDaemon(t)
 	event := validEvent()
