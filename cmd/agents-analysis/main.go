@@ -8,6 +8,7 @@ import (
 
 	"github.com/gonza/agents-analysis/internal/history"
 	"github.com/gonza/agents-analysis/internal/tui"
+	"golang.org/x/term"
 )
 
 const usage = "Usage: agents-analysis [--history <path>] | agents-analysis daemon [--history <path>] [--socket <unix://path>]\n\nOptions:\n  --history <path>  local history file\n  --socket <address> Unix socket for daemon events\n  --help            show this help\n"
@@ -39,6 +40,13 @@ func run(args []string, input io.Reader, output, errors io.Writer) int {
 		return 1
 	}
 	model := tui.Start(records)
+	if input == os.Stdin && output == os.Stdout && term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) {
+		if err := tui.RunTerminal(os.Stdin, os.Stdout, model); err != nil {
+			fmt.Fprintln(errors, "Unable to run history TUI:", err)
+			return 1
+		}
+		return 0
+	}
 	fmt.Fprint(output, model.Render())
 	scanner := bufio.NewScanner(input)
 	for scanner.Scan() {
