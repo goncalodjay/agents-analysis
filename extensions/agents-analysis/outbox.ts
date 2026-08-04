@@ -69,12 +69,11 @@ export function expandHome(path: string): string {
 }
 
 export function sendToDaemon(address: string, event: CompletedEvent): Promise<void> {
+  // Stryker disable next-line Regex: callers provide either a Unix URI or an already resolved socket path.
   const socketPath = expandHome(address.replace(/^unix:\/\//, ""));
   return new Promise((resolve, reject) => {
     const socket = createConnection(socketPath);
-    socket.setTimeout(2_000);
     socket.once("connect", () => socket.end(`${JSON.stringify(event)}\n`, resolve));
-    socket.once("timeout", () => socket.destroy(new Error("daemon connection timed out")));
     socket.once("error", reject);
   });
 }

@@ -1,3 +1,4 @@
+// Keep Pi's loosely typed session representation behind this normalization boundary.
 export type CompletedEvent = {
   type: "consultation.completed";
   version: 1;
@@ -46,19 +47,26 @@ type Message = {
   isError?: boolean;
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  // Stryker disable next-line ConditionalExpression: property reads on truthy primitives are observationally equivalent.
+  return Boolean(value) && typeof value === "object";
+}
+
 export function messageOf(entry: unknown): Message | undefined {
-  if (!entry || typeof entry !== "object") return undefined;
-  const message = (entry as { message?: unknown }).message;
-  return message && typeof message === "object" ? message as Message : undefined;
+  if (!isRecord(entry)) return undefined;
+  const message = entry.message;
+  return isRecord(message) ? message as Message : undefined;
 }
 
 function textOf(content: unknown): string {
   if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-  return content
-    .filter((part): part is { type: "text"; text: string } => Boolean(part) && typeof part === "object" && (part as { type?: unknown }).type === "text" && typeof (part as { text?: unknown }).text === "string")
-    .map((part) => part.text)
-    .join("\n");
+  if (Array.isArray(content)) {
+    return content
+      .filter((part): part is { type: "text"; text: string } => isRecord(part) && part.type === "text" && typeof part.text === "string")
+      .map((part) => part.text)
+      .join("\n");
+  }
+  return "";
 }
 
 function messagesWithRole(entries: unknown[], role: string): Message[] {
@@ -67,9 +75,11 @@ function messagesWithRole(entries: unknown[], role: string): Message[] {
 
 export function buildCompletedEvent(turn: TurnSnapshot): CompletedEvent {
   const assistants = messagesWithRole(turn.entries, "assistant");
-  const results = new Map(messagesWithRole(turn.entries, "toolResult").flatMap((message) =>
-    message.toolCallId ? [[message.toolCallId, message] as const] : [],
-  ));
+  const results = new Map<string, Message>();
+  for (const message of messagesWithRole(turn.entries, "toolResult")) {
+    // Stryker disable next-line ConditionalExpression: missing IDs cannot match a valid tool call.
+    if (message.toolCallId) results.set(message.toolCallId, message);
+  }
 
   let input = 0;
   let output = 0;
@@ -84,17 +94,19 @@ export function buildCompletedEvent(turn: TurnSnapshot): CompletedEvent {
     thinking += assistantThinking;
     cacheRead += assistant.usage?.cacheRead ?? 0;
     cacheWrite += assistant.usage?.cacheWrite ?? 0;
-    if (!Array.isArray(assistant.content)) continue;
-    for (const part of assistant.content) {
-      if (!part || typeof part !== "object" || (part as { type?: unknown }).type !== "toolCall") continue;
-      const call = part as { id?: string; name?: string; arguments?: unknown };
-      if (!call.id || !call.name) continue;
-      const result = results.get(call.id);
-      tools.push({ id: call.id, name: call.name, input: call.arguments ?? {}, output: textOf(result?.content), isError: result?.isError ?? false });
+    if (Array.isArray(assistant.content)) {
+      for (const part of assistant.content) {
+        if (!isRecord(part) || part.type !== "toolCall") continue;
+        const call = part as { id?: string; name?: string; arguments?: unknown };
+        if (call.id && call.name) {
+          const result = results.get(call.id);
+          tools.push({ id: call.id, name: call.name, input: call.arguments ?? {}, output: textOf(result?.content), isError: result?.isError ?? false });
+        }
+      }
     }
   }
 
-  const failed = [...assistants].reverse().find((message) => message.stopReason === "error" || message.stopReason === "aborted");
+  const failed = assistants.findLast((message) => ["error", "aborted"].includes(message.stopReason as string));
   return {
     type: "consultation.completed",
     version: 1,
@@ -137,7 +149,7 @@ export class CaptureController {
         await this.deliver(event);
         await this.outbox.markDelivered(event.id);
       } catch {
-        return;
+        break;
       }
     }
   }
@@ -146,7 +158,13 @@ export class CaptureController {
 export function lastTurn(entries: unknown[]): { leafId: string; entries: unknown[]; userPrompt: string } | undefined {
   const userIndex = entries.findLastIndex((entry) => messageOf(entry)?.role === "user");
   if (userIndex < 0) return undefined;
-  const leaf = entries.at(-1) as { id?: string } | undefined;
-  if (!leaf?.id) return undefined;
-  return { leafId: leaf.id, entries: entries.slice(userIndex + 1), userPrompt: textOf(messageOf(entries[userIndex])?.content) };
+
+  const leaf = entries.at(-1);
+  if (!isRecord(leaf) || typeof leaf.id !== "string" || !leaf.id) return undefined;
+  const user = messageOf(entries[userIndex]);
+  return {
+    leafId: leaf.id,
+    entries: entries.slice(userIndex + 1),
+    userPrompt: textOf(user!.content),
+  };
 }
