@@ -180,7 +180,10 @@ test("sends one newline-delimited event to a Unix daemon and reports connection 
   const directory = await mkdtemp(join(tmpdir(), "agents-analysis-daemon-"));
   const socketPath = join(directory, "daemon.sock");
   const chunks: Buffer[] = [];
-  const server = createServer((socket) => socket.on("data", (chunk) => chunks.push(chunk)));
+  const server = createServer((socket) => {
+    socket.on("data", (chunk) => chunks.push(chunk));
+    socket.on("end", () => socket.end('{"accepted":true}\n'));
+  });
   try {
     await new Promise<void>((resolve, reject) => server.listen(socketPath, resolve).once("error", reject));
     await sendToDaemon(`unix://${socketPath}`, event("sent"));

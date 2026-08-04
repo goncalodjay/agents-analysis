@@ -45,6 +45,7 @@ test("builds a completed event preserving identity, content, usage, duration, re
   const event = buildCompletedEvent(turn);
 
   assert.equal(event.id, "pi-1:assistant-1");
+  assert.equal(event.agent, "pi");
   assert.deepEqual(event.identity, { sessionId: "pi-1", turnId: "assistant-1", provider: "openai", model: "gpt-5", reasoningLevel: "medium" });
   assert.deepEqual(event.content, { systemPrompt: "eres-asistente", context: "AGENTS.md=reglas", userPrompt: "resume-el-repositorio", response: "repositorio-resumido" });
   assert.deepEqual(event.usage, { input: 120, prompt: 80, thinking: 40, output: 160, cacheRead: 80, cacheWrite: 0 });

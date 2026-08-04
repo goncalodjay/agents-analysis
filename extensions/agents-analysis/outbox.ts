@@ -73,7 +73,20 @@ export function sendToDaemon(address: string, event: CompletedEvent): Promise<vo
   const socketPath = expandHome(address.replace(/^unix:\/\//, ""));
   return new Promise((resolve, reject) => {
     const socket = createConnection(socketPath);
-    socket.once("connect", () => socket.end(`${JSON.stringify(event)}\n`, resolve));
+    const chunks: Buffer[] = [];
+    socket.setTimeout(2_000);
+    socket.on("data", (chunk: Buffer) => chunks.push(chunk));
+    socket.once("connect", () => socket.end(`${JSON.stringify(event)}\n`));
+    socket.once("timeout", () => socket.destroy(new Error("daemon connection timed out")));
     socket.once("error", reject);
+    socket.once("end", () => {
+      try {
+        const reply = JSON.parse(Buffer.concat(chunks).toString("utf8")) as { accepted?: boolean; reason?: string };
+        if (reply.accepted) resolve();
+        else reject(new Error(reply.reason ?? "daemon rejected event"));
+      } catch {
+        reject(new Error("daemon sent an invalid confirmation"));
+      }
+    });
   });
 }
