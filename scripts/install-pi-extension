@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+extensions=${PI_AGENT_HOME:-"$HOME/.pi/agent"}/extensions
+target=$extensions/agents-analysis.ts
+mkdir -p "$extensions/agents-analysis"
+cp "$root/extensions/agents-analysis.ts" "$target"
+cp "$root/extensions/agents-analysis/core.ts" "$root/extensions/agents-analysis/outbox.ts" "$extensions/agents-analysis/"
+printf 'Installed %s\n' "$target"
