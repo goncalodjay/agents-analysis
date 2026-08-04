@@ -3,7 +3,8 @@ import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
-import { CaptureController, FileOutbox, buildCompletedEvent, type CompletedEvent, type Outbox } from "./agents-analysis.ts";
+import { CaptureController, buildCompletedEvent, lastTurn, type CompletedEvent, type Outbox } from "./agents-analysis/core.ts";
+import { FileOutbox } from "./agents-analysis/outbox.ts";
 
 function memoryOutbox(): Outbox & { pending: CompletedEvent[]; delivered: Set<string> } {
   const pending: CompletedEvent[] = [];
@@ -52,6 +53,37 @@ test("builds a completed event preserving identity, content, usage, duration, re
   assert.deepEqual(event.tools, [{ id: "call-1", name: "read", input: { path: "file" }, output: "contenido", isError: false }]);
 });
 
+test("preserves terminal errors and clamps reversed durations", () => {
+  const event = buildCompletedEvent({
+    ...turn,
+    startedAt: 4_000,
+    settledAt: 3_000,
+    entries: [
+      null,
+      { message: { role: "assistant", stopReason: "aborted", errorMessage: "cancelled", content: "partial" } },
+    ],
+  });
+
+  assert.equal(event.result, "error");
+  assert.equal(event.error, "cancelled");
+  assert.equal(event.durationMs, 0);
+  assert.equal(event.content.response, "partial");
+});
+
+test("extracts the last user turn from a session branch", () => {
+  assert.deepEqual(lastTurn([
+    { id: "user-1", message: { role: "user", content: "first" } },
+    { id: "assistant-1", message: { role: "assistant", content: [] } },
+    { id: "user-2", message: { role: "user", content: [{ type: "text", text: "latest" }] } },
+    { id: "assistant-2", message: { role: "assistant", content: [] } },
+  ]), {
+    leafId: "assistant-2",
+    entries: [{ id: "assistant-2", message: { role: "assistant", content: [] } }],
+    userPrompt: "latest",
+  });
+  assert.equal(lastTurn([]), undefined);
+});
+
 test("does not deliver a settled consultation twice", async () => {
   const outbox = memoryOutbox();
   const delivered: CompletedEvent[] = [];
@@ -95,7 +127,11 @@ test("persists pending events across extension restarts", async () => {
     await new CaptureController(new FileOutbox(path), async (pending) => { delivered.push(pending.id); }).retry();
 
     assert.deepEqual(delivered, [event.id]);
-    assert.deepEqual(await new FileOutbox(path).listPending(), []);
+    const restarted = new FileOutbox(path);
+    assert.deepEqual(await restarted.listPending(), []);
+    assert.equal(await restarted.hasDelivered(event.id), true);
+    await restarted.enqueue(event);
+    assert.deepEqual(await restarted.listPending(), []);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
