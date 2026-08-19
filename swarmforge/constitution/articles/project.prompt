@@ -1,8 +1,14 @@
 # Project Rules
 
 ## Project Shape
-- This project is configured for SwarmForge with four Codex-backed agents: specifier, coder, refactorer, and architect.
-- Project language: Babashka.
+- This project is configured for SwarmForge with four AI-backed agents: specifier, coder, refactorer, and architect. Their CLI backends are configured in `swarmforge/swarmforge.conf`.
+- Project languages: Python, Typescript.
+- Before changing code, inspect the repository to identify its build, test, formatting, and dependency commands. Use tools already available in the project or on the local machine.
+
+## Local-First Tooling
+- Prefer tools, scripts, and dependencies that are already available locally or installed through the project's own dependency manager.
+- Do not clone or download standalone tools, prompts, or scripts from remote repositories unless they are declared as project dependencies.
+- If a required tool is unavailable locally and cannot be added through the project's dependency manager, report the exact missing command and ask the user how to proceed.
 
 ## Local Configuration
 - Preserve project-local SwarmForge configuration under `swarmforge/`.
@@ -10,6 +16,10 @@
 
 ## Handoffs
 - Prefer terse, explicit handoffs that report state and request role-appropriate review. Do not include verifications or sender process narrative.
+
+## Language
+- All project artifacts — source code, comments, identifiers, documentation, commit messages, and Gherkin feature files — are written in English.
+- Agent replies to the user may match the user's language, but generated technical artifacts must be in English.
 
 ## Ownership
 - Do not change another role's prompt or workflow ownership without explicit user direction.
