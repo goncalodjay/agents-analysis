@@ -1,14 +1,6 @@
 #!/bin/sh
 set -eu
 
-parser="${GHERKIN_PARSER:-$PWD/.tools/bin/gherkin-parser}"
-if [ ! -x "$parser" ]; then
-  mkdir -p .tools/bin .cache/gomod .cache/gocache tmp
-  rm -rf tmp/acceptance-pipeline-specification
-  git clone --depth 1 https://github.com/unclebob/Acceptance-Pipeline-Specification.git tmp/acceptance-pipeline-specification
-  (cd tmp/acceptance-pipeline-specification && \
-    GOMODCACHE="$OLDPWD/.cache/gomod" GOCACHE="$OLDPWD/.cache/gocache" \
-    go build -o "$OLDPWD/.tools/bin/gherkin-parser" ./cmd/gherkin-parser)
-  parser="$PWD/.tools/bin/gherkin-parser"
-fi
-GHERKIN_PARSER="$parser" go run ./cmd/acceptance
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$root"
+node --experimental-strip-types src/acceptance.ts

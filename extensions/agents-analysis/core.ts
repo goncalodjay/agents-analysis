@@ -1,3 +1,38 @@
+// Pi's system prompt bundles a large static block (tool descriptions, guidelines, doc
+// pointers, skill-loading instructions) that's identical on every call and adds nothing to
+// the analysis. Cut it out, keeping the short role preamble and the one line that does vary
+// per session (the working directory). Duplicated in src/tui/model.ts — the TUI applies the
+// same trim at display time for rows captured before this existed, and this extension is
+// copied standalone into Pi's extensions directory, so it can't import from src/.
+const TOOLS_MARKER = "\nAvailable tools:";
+const CWD_MARKER = "\nCurrent working directory:";
+
+export function stripSystemPromptBoilerplate(systemPrompt: string): string {
+  const startIndex = systemPrompt.indexOf(TOOLS_MARKER);
+  if (startIndex === -1) return systemPrompt;
+  const endIndex = systemPrompt.indexOf(CWD_MARKER, startIndex);
+  const head = systemPrompt.slice(0, startIndex).trimEnd();
+  const tail = endIndex === -1 ? "" : systemPrompt.slice(endIndex).trim();
+  return tail ? `${head}\n${tail}` : head;
+}
+
+/** A call the agent delegated to a sub-agent. Adapters that cannot observe delegated calls
+ * simply omit the field. `cost` is only set when the agent itself reported a price — the daemon
+ * fills in the rest from its rate table rather than the adapter guessing. */
+export type SubAgentEvent = {
+  id: string;
+  name: string;
+  description?: string;
+  prompt: string;
+  response?: string;
+  provider?: string;
+  model?: string;
+  usage?: { input: number; prompt: number; thinking: number; output: number };
+  cost?: number;
+  durationMs?: number;
+  error?: string;
+};
+
 // Keep Pi's loosely typed session representation behind this normalization boundary.
 export type CompletedEvent = {
   type: "consultation.completed";
@@ -13,6 +48,10 @@ export type CompletedEvent = {
   result: "success" | "error";
   error?: string;
   tools: Array<{ id: string; name: string; input: unknown; output: string; isError: boolean }>;
+  subAgents?: SubAgentEvent[];
+  /** What the agent itself says the turn cost. Present only for agents that report a price
+   * (opencode does); the daemon prefers it over its own rate table. */
+  cost?: number;
 };
 
 export type TurnSnapshot = {
@@ -115,7 +154,7 @@ export function buildCompletedEvent(turn: TurnSnapshot): CompletedEvent {
     agent: "pi",
     identity: { sessionId: turn.sessionId, turnId: turn.leafId, provider: turn.provider, model: turn.model, reasoningLevel: turn.reasoningLevel },
     content: {
-      systemPrompt: turn.systemPrompt,
+      systemPrompt: stripSystemPromptBoilerplate(turn.systemPrompt),
       context: turn.context,
       userPrompt: turn.userPrompt,
       response: assistants.map((message) => textOf(message.content)).filter(Boolean).join("\n"),

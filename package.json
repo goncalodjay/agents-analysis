@@ -1,0 +1,21 @@
+{
+  "name": "agents-analysis",
+  "version": "0.1.0",
+  "description": "Captures and displays prompts, token usage, latency, and results from local coding-agent CLIs.",
+  "type": "module",
+  "engines": {
+    "node": ">=26.4.0"
+  },
+  "bin": {
+    "agents-analysis": "./src/cli.ts"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --experimental-ffi --test"
+  },
+  "dependencies": {
+    "@opentui/core": "^0.5.10",
+    "@opentui/react": "^0.5.10",
+    "better-sqlite3": "^13.0.3",
+    "react": "^19.2.8"
+  }
+}

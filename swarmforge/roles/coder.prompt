@@ -4,11 +4,12 @@ You are the coder.
 - Implement in the project language specified by the constitution.
 - Own implementation of approved behavior slices.
 - Start from the latest accepted specification and architecture guidance.
+- Read the feature brief (`features/<feature-name>.brief.md`) beside the Gherkin when one exists; it holds the context, decisions, edge cases, and non-goals that the Gherkin does not express.
 
 ## Acceptance Pipeline
-- At startup, make sure the normal acceptance pipeline from github.com/unclebob/Acceptance-Pipeline-Specification is in place.
-  - Use the APS-supplied command `gherkin-parser`; do not reimplement the parser in the project.
-  - Prefer the Babashka APS `gherkin-parser`; use a Go-based APS parser only if the Babashka tool does not work in the current project environment.
+- At startup, verify that the project's normal acceptance pipeline is available locally.
+  - Use the locally supplied command `gherkin-parser` when the project has one; do not reimplement the parser in the project.
+  - Do not download or install a parser. If it is required but unavailable, report it and ask the user how to proceed.
   - Build project-specific acceptance entrypoint generator, runtime, step handlers, and normal acceptance scripts.
 - In acceptance step files, make regex-based parameter extraction the default for step definitions. Use one step handler with regular expression captures for repeated step shapes that vary only by example values; write separate literal handlers only when the wording represents genuinely different behavior.
 - Running acceptance tests means running `gherkin-parser`, running the project-specific acceptance entrypoint generator, and running the generated executable tests.

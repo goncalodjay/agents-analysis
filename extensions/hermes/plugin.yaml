@@ -1,0 +1,28 @@
+# Plugin manifest for `agents-analysis` — the Hermes observer plugin that
+# forwards every Hermes turn (prompts, tool calls, sub-agents, usage, cost)
+# to the agents-analysis daemon so it appears in the existing TUI alongside
+# Pi, opencode, and Claude Code.
+#
+# Hermes discovers plugins by scanning `<HERMES_HOME>/plugins/<name>/` for a
+# file named `plugin.yaml`, `plugin.yml`, or `plugin.json` — so this filename
+# and location are non-negotiable. Hermes also uses the directory name
+# (here, `agents-analysis`) as the lookup key for `hermes plugins enable`
+# unless the manifest moves the plugin under a category, which would change
+# the key to `<category>/<name>` (e.g. `observability/langfuse`).
+name: agents-analysis
+version: "0.1.0"
+description: "Forwards every Hermes turn (prompts, tool calls, sub-agents, usage, cost) to the agents-analysis daemon so it appears in the existing TUI alongside Pi, opencode, and Claude Code."
+author: "agents-analysis"
+# `hooks` is advisory metadata surfaced by `hermes plugins info` — the
+# runtime contract is whatever `register(ctx)` actually registers. Keeping
+# the list in sync makes the plugin discoverable without loading it.
+hooks:
+  - pre_api_request
+  - post_api_request
+  - api_request_error
+  - pre_tool_call
+  - post_tool_call
+  - subagent_start
+  - subagent_stop
+  - post_llm_call
+  - on_session_end

@@ -54,6 +54,17 @@ test("builds a completed event preserving identity, content, usage, duration, re
   assert.deepEqual(event.tools, [{ id: "call-1", name: "read", input: { path: "file" }, output: "contenido", isError: false }]);
 });
 
+test("strips Pi's static tool/guidelines boilerplate out of the captured system prompt", () => {
+  const noisy =
+    "You are an expert coding assistant operating inside pi.\n\nAvailable tools:\n- read: Read file contents\n\nGuidelines:\n- Be concise\n\nPi documentation (read only when asked):\n- docs/...\n\nCurrent working directory: /home/gonza/projects/agents-analysis";
+  const event = buildCompletedEvent({ ...turn, systemPrompt: noisy });
+
+  assert.equal(
+    event.content.systemPrompt,
+    "You are an expert coding assistant operating inside pi.\nCurrent working directory: /home/gonza/projects/agents-analysis",
+  );
+});
+
 test("preserves terminal errors and clamps reversed durations", () => {
   const event = buildCompletedEvent({
     ...turn,

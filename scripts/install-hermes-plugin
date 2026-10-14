@@ -1,0 +1,32 @@
+#!/bin/sh
+# Install the agents-analysis Hermes observer plugin into ~/.hermes/.
+#
+# Mirrors scripts/install-pi-extension: copies the plugin source from this
+# repo into the plugin directory the runtime scans. Honours $HERMES_HOME so
+# a per-profile install Just Works.
+#
+# Hermes discovers plugins by scanning <HERMES_HOME>/plugins/<name>/ for
+# a `plugin.yaml` (or `plugin.yml` / `plugin.json`) manifest. Without one,
+# `hermes plugins enable <name>` reports the plugin as not installed.
+#
+# Usage:
+#   ./scripts/install-hermes-plugin
+#   HERMES_HOME=~/.hermes/profiles/work ./scripts/install-hermes-plugin
+#
+# After install:
+#   hermes plugins enable agents-analysis
+#   hermes chat -q "Reply exactly ok"
+#
+# Verify by listing captured turns:
+#   agents-analysis            # opens the TUI; a "hermes" entry should appear
+set -eu
+
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+home=${HERMES_HOME:-"$HOME/.hermes"}
+target="$home/plugins/agents-analysis"
+mkdir -p "$target"
+cp "$root/extensions/hermes/__init__.py" "$target/"
+cp "$root/extensions/hermes/state.py" "$target/"
+cp "$root/extensions/hermes/plugin.yaml" "$target/"
+printf 'Installed %s\n' "$target"
+printf 'Enable with:  hermes plugins enable agents-analysis\n'

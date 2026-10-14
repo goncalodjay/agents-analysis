@@ -8,3 +8,8 @@ build/
 tmp/
 .cache/
 .tools/
+node_modules/
+package-lock.json
+__pycache__/
+*.pyc
+*.sqlite

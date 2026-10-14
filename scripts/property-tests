@@ -4,5 +4,5 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$root"
 node --experimental-strip-types --test extensions/agents-analysis.property.test.ts
-GOMODCACHE="$root/.cache/gomod" GOCACHE="$root/.cache/gocache" \
-  go test -tags property ./internal/... -run Property
+# The whole-suite pass loads the TUI, whose renderer needs node:ffi.
+node --experimental-strip-types --experimental-ffi --test --test-name-pattern="^property:"
